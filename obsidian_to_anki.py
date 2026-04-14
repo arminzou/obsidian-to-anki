@@ -3,6 +3,7 @@
 import re
 import json
 import urllib.request
+import urllib.parse
 import configparser
 import os
 import collections
@@ -74,9 +75,71 @@ md_parser = markdown.Markdown(
     ]
 )
 
+DEFAULT_ANKI_CONNECT_URL = "http://localhost:8765"
+
+
+def load_dotenv(dotenv_path):
+    """Load simple KEY=VALUE pairs from a .env file into os.environ."""
+    if not os.path.exists(dotenv_path):
+        return
+    try:
+        with open(dotenv_path, encoding="utf_8") as dotenv_file:
+            for raw_line in dotenv_file:
+                line = raw_line.strip()
+                if not line or line.startswith("#") or "=" not in line:
+                    continue
+                key, value = line.split("=", 1)
+                key = key.strip()
+                value = value.strip().strip('"').strip("'")
+                if key and key not in os.environ:
+                    os.environ[key] = value
+    except OSError:
+        pass
+
+
+def get_anki_url_from_env():
+    """Return Anki URL from environment vars, preferring ANKICONNECT_URL."""
+    return (
+        os.environ.get("ANKICONNECT_URL")
+        or os.environ.get("OBSIDIAN_TO_ANKI_URL")
+    )
+
+
+load_dotenv(
+    os.path.join(
+        os.path.dirname(os.path.realpath(__file__)),
+        ".env"
+    )
+)
+ANKI_CONNECT_URL = get_anki_url_from_env() or DEFAULT_ANKI_CONNECT_URL
 ANKI_PORT = 8765
+ANKI_HOST = "localhost"
 
 ANKI_CLOZE_REGEXP = re.compile(r'{{c\d+::[\s\S]+?}}')
+
+
+def refresh_anki_endpoint():
+    """Refresh AnkiConnect host/port from env or config."""
+    global ANKI_CONNECT_URL, ANKI_HOST, ANKI_PORT
+    url = get_anki_url_from_env()
+    if not url:
+        url = CONFIG_DATA.get("AnkiConnect URL", DEFAULT_ANKI_CONNECT_URL)
+    url = (url or DEFAULT_ANKI_CONNECT_URL).strip().rstrip("/")
+    ANKI_CONNECT_URL = url
+    parsed = urllib.parse.urlparse(ANKI_CONNECT_URL)
+    ANKI_HOST = parsed.hostname or "localhost"
+    try:
+        parsed_port = parsed.port
+    except ValueError:
+        parsed_port = None
+    if parsed_port:
+        ANKI_PORT = parsed_port
+    elif parsed.scheme == "https":
+        ANKI_PORT = 443
+    elif parsed.scheme == "http":
+        ANKI_PORT = 80
+    else:
+        ANKI_PORT = 8765
 
 
 def has_clozes(text):
@@ -193,7 +256,8 @@ def load_anki():
             [CONFIG_DATA["Path"], "-p", CONFIG_DATA["Profile"]]
         )
         try:
-            wait_for_port(ANKI_PORT)
+            refresh_anki_endpoint()
+            wait_for_port(ANKI_PORT, host=ANKI_HOST)
         except TimeoutError:
             print(
                 "Opened Anki, but can't connect! Is AnkiConnect working?"
@@ -230,7 +294,7 @@ class AnkiConnect:
             AnkiConnect.request(action, **params)
         ).encode('utf-8')
         response = json.load(urllib.request.urlopen(
-            urllib.request.Request('http://localhost:8765', requestJson)))
+            urllib.request.Request(ANKI_CONNECT_URL, requestJson)))
         return AnkiConnect.parse(response)
 
     def parse(response):
@@ -753,6 +817,9 @@ class Config:
         config["Defaults"].setdefault(
             "Anki Profile", ""
         )
+        config["Defaults"].setdefault(
+            "AnkiConnect URL", DEFAULT_ANKI_CONNECT_URL
+        )
 
     def update_config():
         """Update config with new notes."""
@@ -839,6 +906,10 @@ class Config:
         config.read(CONFIG_PATH, encoding='utf-8-sig')
         Config.load_syntax(config)
         Config.load_defaults(config)
+        CONFIG_DATA["AnkiConnect URL"] = config["Defaults"].get(
+            "AnkiConnect URL", DEFAULT_ANKI_CONNECT_URL
+        )
+        refresh_anki_endpoint()
         CONFIG_DATA["CUSTOM_REGEXPS"] = config["Custom Regexps"]
         print("Loaded successfully!")
 
@@ -1321,7 +1392,7 @@ class File:
             self.file, list(
                 zip(
                     self.id_indexes, [
-                        self.id_to_str(id, comment=CONFIG_DATA["Comment"])
+                        "\n" + self.id_to_str(id, comment=CONFIG_DATA["Comment"])
                         for id in self.note_ids[:len(self.notes_to_add)]
                         if id is not None
                     ]
@@ -1592,7 +1663,7 @@ class RegexFile(File):
         self.file = string_insert(
             self.file, zip(
                 self.id_indexes, [
-                    "\n" + File.id_to_str(id, comment=CONFIG_DATA["Comment"])
+                    "\n\n" + File.id_to_str(id, comment=CONFIG_DATA["Comment"])
                     for id in self.note_ids
                     if id is not None
                 ]
@@ -1766,8 +1837,9 @@ class Directory:
 
 if __name__ == "__main__":
     print("Attempting to connect to Anki...")
+    refresh_anki_endpoint()
     try:
-        wait_for_port(ANKI_PORT)
+        wait_for_port(ANKI_PORT, host=ANKI_HOST)
     except TimeoutError:
         print("Couldn't connect to Anki, attempting to open Anki...")
         if load_anki():
