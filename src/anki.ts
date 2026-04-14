@@ -1,4 +1,6 @@
 const ANKI_PORT: number = 8765
+const DEFAULT_ANKI_CONNECT_URL = "http://127.0.0.1:" + ANKI_PORT.toString()
+let ANKI_CONNECT_URL = DEFAULT_ANKI_CONNECT_URL
 
 import { AnkiConnectNote } from './interfaces/note-interface'
 
@@ -6,6 +8,11 @@ export interface AnkiConnectRequest {
 	action: string,
 	version: 6,
 	params: any
+}
+
+export function setAnkiConnectUrl(url?: string) {
+	const parsedUrl = (url ?? "").trim().replace(/\/+$/, "")
+	ANKI_CONNECT_URL = parsedUrl ? parsedUrl : DEFAULT_ANKI_CONNECT_URL
 }
 
 export function invoke(action: string, params={}) {
@@ -33,7 +40,7 @@ export function invoke(action: string, params={}) {
             }
         });
 
-        xhr.open('POST', 'http://127.0.0.1:' + ANKI_PORT.toString());
+        xhr.open('POST', ANKI_CONNECT_URL);
         xhr.send(JSON.stringify({action, version: 6, params}));
     });
 }

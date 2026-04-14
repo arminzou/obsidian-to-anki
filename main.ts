@@ -42,6 +42,7 @@ export default class MyPlugin extends Plugin {
 				"CurlyCloze - Highlights to Clozes": false,
 				"ID Comments": true,
 				"Add Obsidian Tags": false,
+				"AnkiConnect URL": "http://127.0.0.1:8765",
 			},
 			IGNORED_FILE_GLOBS: DEFAULT_IGNORED_FILE_GLOBS,
 		}
@@ -233,6 +234,10 @@ export default class MyPlugin extends Plugin {
 			new Notice("Couldn't connect to Anki! Check console for error message.")
 			return
 		}
+		if (!(this.settings["Defaults"].hasOwnProperty("AnkiConnect URL"))) {
+			this.settings["Defaults"]["AnkiConnect URL"] = "http://127.0.0.1:8765"
+		}
+		AnkiConnect.setAnkiConnectUrl(this.settings["Defaults"]["AnkiConnect URL"])
 
 		this.note_types = Object.keys(this.settings["CUSTOM_REGEXPS"])
 		this.fields_dict = await this.loadFieldsDict()

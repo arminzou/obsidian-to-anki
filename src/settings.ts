@@ -11,7 +11,8 @@ const defaultDescs = {
 	"CurlyCloze": "Convert {cloze deletions} -> {{c1::cloze deletions}} on note types that have a 'Cloze' in their name.",
 	"CurlyCloze - Highlights to Clozes": "Convert ==highlights== -> {highlights} to be processed by CurlyCloze.",
 	"ID Comments": "Wrap note IDs in a HTML comment.",
-	"Add Obsidian Tags": "Interpret #tags in the fields of a note as Anki tags, removing them from the note text in Anki."
+	"Add Obsidian Tags": "Interpret #tags in the fields of a note as Anki tags, removing them from the note text in Anki.",
+	"AnkiConnect URL": "AnkiConnect endpoint URL, e.g. http://127.0.0.1:8765."
 }
 
 export const DEFAULT_IGNORED_FILE_GLOBS = [
@@ -187,6 +188,10 @@ export class SettingsTab extends PluginSettingTab {
 		if (!(plugin.settings["Defaults"].hasOwnProperty("Scheduling Interval"))) {
 			plugin.settings["Defaults"]["Scheduling Interval"] = 0
 		}
+		// To account for custom AnkiConnect URL
+		if (!(plugin.settings["Defaults"].hasOwnProperty("AnkiConnect URL"))) {
+			plugin.settings["Defaults"]["AnkiConnect URL"] = "http://127.0.0.1:8765"
+		}
 		// To account for new highlights to clozes
 		if (!(plugin.settings["Defaults"].hasOwnProperty("CurlyCloze - Highlights to Clozes"))) {
 			plugin.settings["Defaults"]["CurlyCloze - Highlights to Clozes"] = false
@@ -208,6 +213,9 @@ export class SettingsTab extends PluginSettingTab {
 						text => text.setValue(plugin.settings["Defaults"][key])
 						.onChange((value) => {
 							plugin.settings["Defaults"][key] = value
+							if (key === "AnkiConnect URL") {
+								AnkiConnect.setAnkiConnectUrl(value)
+							}
 							plugin.saveAllData()
 						})
 				)

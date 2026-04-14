@@ -21,13 +21,14 @@ export interface PluginSettings {
 		"Scan Directory": string,
 		"Tag": string,
 		"Deck": string,
-		"Scheduling Interval": number
+		"Scheduling Interval": number,
 		"Add File Link": boolean,
 		"Add Context": boolean,
 		"CurlyCloze": boolean,
 		"CurlyCloze - Highlights to Clozes": boolean,
 		"ID Comments": boolean,
-		"Add Obsidian Tags": boolean
+		"Add Obsidian Tags": boolean,
+		"AnkiConnect URL": string
 	},
 	IGNORED_FILE_GLOBS:string[]
 }
